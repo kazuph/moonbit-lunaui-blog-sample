@@ -94,6 +94,9 @@ fn root_layout(
   @server_dom.ServerNode::async_(async fn() {
     let inner = content.resolve()
     @luna.fragment([
+      div(class="notice-banner", [
+        text("このブログは MoonBit × Luna UI のテスト用です。記事の内容はAIが生成したサンプルです。"),
+      ]),
       div(class="container", [
         nav(class="main-nav", [
           a(href="/", [strong([text("Blog")])]),
@@ -469,6 +472,19 @@ const ROOT : String =
   #|    a { color: var(--color-accent); text-decoration: none; transition: color var(--transition); }
   #|    a:hover { color: var(--color-accent-hover); }
   #|    #__sol__ { max-width: 1400px; margin: 0 auto; padding: 24px 20px; min-height: 100vh; }
+  #|    .notice-banner {
+  #|      background: linear-gradient(135deg, #f0e6d3 0%, #e8dcc8 100%);
+  #|      border: 1px solid var(--color-border);
+  #|      border-radius: var(--radius-md);
+  #|      padding: 12px 20px;
+  #|      margin-bottom: 20px;
+  #|      text-align: center;
+  #|      font-size: 0.9rem;
+  #|      color: var(--color-text-muted);
+  #|      max-width: 720px;
+  #|      margin-left: auto;
+  #|      margin-right: auto;
+  #|    }
   #|    .container { max-width: 720px; margin: 0 auto; }
   #|    .main-nav {
   #|      display: flex;
