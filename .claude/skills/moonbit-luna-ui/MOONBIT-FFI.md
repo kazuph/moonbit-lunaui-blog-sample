@@ -244,11 +244,150 @@ fn get_slug(data : @js.Any) -> String {
 
 | FFI | 理由 |
 |-----|------|
-| `db_*` (7件) | Cloudflare D1 SQL操作 - JSバインディング必須 |
+| `get_global_db()` | D1バインディング取得 - 1 FFIのみ |
 | `get_timestamp()` | Date API - JSのみ |
 | `redirect_to(url)` | `window.location.href` - DOM API |
 | `get_form_data_from_form()` | FormData API - DOM API |
 | `safe_decode_uri()` | `decodeURIComponent()` - 例外処理含むためFFI推奨 |
+
+---
+
+## mizchi/cloudflare パッケージ（推奨）
+
+**`mizchi/cloudflare` パッケージを使用することで、D1/KV/R2/Durable Objectsへのアクセスを型安全に行える。**
+
+### インストール
+
+```bash
+moon add mizchi/cloudflare
+```
+
+### moon.pkg.json への追加
+
+```json
+{
+  "import": [
+    { "path": "mizchi/cloudflare", "alias": "cloudflare" }
+  ]
+}
+```
+
+### D1データベースアクセス
+
+```moonbit
+///| D1データベース取得（最小FFI - バインディング取得のみ）
+fn get_db() -> @cloudflare.D1Database {
+  let db_js : @core.Any = get_global_db()
+  @core.identity(db_js)
+}
+
+extern "js" fn get_global_db() -> @core.Any =
+  #| () => {
+  #|   const db = globalThis.__D1_DB;
+  #|   if (!db) throw new Error('D1 database not initialized');
+  #|   return db;
+  #| }
+
+///| 全記事取得 - 本家パッケージのAPIを使用
+pub async fn db_get_all_posts() -> @core.Any {
+  let db = get_db()
+  let result = db
+    .prepare("SELECT * FROM posts ORDER BY updated_at DESC")
+    .all()
+  result.results_raw()
+}
+
+///| 条件付き取得 - bind()でパラメータバインド
+pub async fn db_get_post_by_slug(slug : String) -> @core.Any {
+  let db = get_db()
+  let row = db
+    .prepare("SELECT * FROM posts WHERE slug = ?")
+    .bind1(@core.any(slug))
+    .first()
+  match row {
+    Some(r) => r
+    None => @core.null()
+  }
+}
+
+///| INSERT/UPDATE/DELETE - run()を使用
+pub async fn db_delete_post(id : String) -> @cloudflare.D1Result {
+  let db = get_db()
+  db.prepare("DELETE FROM posts WHERE id = ?")
+    .bind1(@core.any(id))
+    .run()
+}
+
+///| 複数パラメータのバインド - bind()で配列を渡す
+pub async fn db_create_post(
+  title : String,
+  slug : String,
+  content : String
+) -> @core.Any {
+  let db = get_db()
+  let row = db
+    .prepare("INSERT INTO posts (title, slug, content) VALUES (?, ?, ?) RETURNING *")
+    .bind([
+      @core.any(title),
+      @core.any(slug),
+      @core.any(content),
+    ])
+    .first()
+  match row {
+    Some(r) => r
+    None => @core.null()
+  }
+}
+```
+
+### @cloudflare.D1Database API
+
+| メソッド | 説明 |
+|---------|------|
+| `prepare(query: String)` | D1PreparedStatementを作成 |
+
+### @cloudflare.D1PreparedStatement API
+
+| メソッド | 説明 |
+|---------|------|
+| `bind(params: Array[@core.Any])` | 複数パラメータをバインド |
+| `bind1(param: @core.Any)` | 1パラメータをバインド |
+| `bind2(p1, p2)` | 2パラメータをバインド |
+| `first()` | 1行取得 (Option[@core.Any]) |
+| `all()` | 全行取得 (D1Result) |
+| `run()` | INSERT/UPDATE/DELETE実行 (D1Result) |
+
+### @cloudflare.D1Result API
+
+| メソッド | 説明 |
+|---------|------|
+| `results_raw()` | 結果配列を取得 |
+| `success()` | 成功チェック |
+| `meta()` | メタ情報取得 |
+
+### FFI削減効果
+
+```
+Before (独自FFI):  7 FFI (db_get_*, db_create_*, db_update_*, db_delete_*)
+After (本家使用):  1 FFI (get_global_db のみ)
+削減率: 86%
+```
+
+### なぜ1つのFFIが必要か？
+
+Cloudflare Workers の D1 バインディングは `env.DB` から取得する必要がある。
+Sol Framework の PageProps からは直接 env にアクセスできないため、
+worker.ts で `globalThis.__D1_DB = env.DB` を設定し、MoonBit側で取得する。
+
+```typescript
+// src/worker.ts
+export default {
+  fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
+    (globalThis as any).__D1_DB = env.DB;
+    // ...
+  }
+}
+```
 
 ---
 

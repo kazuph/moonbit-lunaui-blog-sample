@@ -8,6 +8,7 @@ MoonBitとLuna UI (Sol Framework) を使用したブログ管理ツールの実�
 - **UIフレームワーク**: Luna UI (Sol Framework)
 - **ランタイム**: Cloudflare Workers
 - **データベース**: D1 (SQLite)
+- **Cloudflare Bindings**: mizchi/cloudflare パッケージ
 
 ## 言語比率（アプリケーションコード）
 
@@ -82,12 +83,15 @@ tests/e2e/           # E2Eテスト（Playwright）
 
 | カテゴリ | 移行前FFI | 移行後FFI | 削減率 |
 |---------|----------|----------|--------|
-| データヘルパー | 6 | 1 | 83% |
+| データヘルパー | 6 | 0 | 100% |
 | 文字列/JSON | 5 | 0 | 100% |
-| クライアント | 5 | 2 | 60% |
+| クライアント | 5 | 3 | 40% |
 | フレームワーク連携 | 3 | 0 | 100% |
-| D1 SQL | 7 | 7 | - |
-| **合計** | **26** | **10** | **62%** |
+| D1 SQL | 7 | 1 | **86%** |
+| その他 | 0 | 2 | - |
+| **合計** | **26** | **6** | **77%** |
+
+> 🎯 **mizchi/cloudflare パッケージ採用**: D1アクセスを本家パッケージに移行し、FFIを7→1に削減
 
 ### MoonBit化された機能
 
@@ -98,15 +102,18 @@ tests/e2e/           # E2Eテスト（Playwright）
 - **クライアント**: `get_message`, `get_slug`, `generate_slug`
 - **フレームワーク連携**: `parseBody()`, `redirect()` (Sol Framework API使用)
 
-### 削除不可能なFFI
+### 残存FFI（6件）
 
-| FFI | 理由 |
-|-----|------|
-| D1 SQL操作 (7件) | Cloudflare D1 APIの制約 |
-| `get_timestamp` | JavaScript Date API |
-| `redirect_to` | DOM window.location API |
-| `get_form_data_from_form` | DOM FormData API |
-| `safe_decode_uri` | JavaScript decodeURIComponent例外処理 |
+| FFI | 場所 | 理由 |
+|-----|------|------|
+| `get_global_db` | server | D1バインディング取得（1件に削減） |
+| `get_timestamp` | server | JavaScript Date API |
+| `safe_decode_uri` | server | decodeURIComponent例外処理 |
+| `redirect_to` | client | DOM window.location API |
+| `confirm_delete` | client | DOM window.confirm API |
+| `get_form_data_from_form` | client | DOM FormData API |
+
+> ✅ **D1アクセス最適化**: `mizchi/cloudflare`パッケージの`D1Database`/`D1PreparedStatement`型を使用し、SQL操作を型安全に実行
 
 ## 技術的知見
 

@@ -4,13 +4,19 @@
   "deps": {
     "mizchi/luna": "0.4.1",
     "mizchi/js": "0.10.7",
-    "mizchi/markdown": "0.3.3"
+    "mizchi/markdown": "0.3.3",
+    "mizchi/cloudflare": "0.1.1"
   },
-  "source": "app",
-  "preferred-target": "js",
   "readme": "README.mbt.md",
   "repository": "",
   "license": "MIT",
-  "keywords": ["blog", "luna-ui", "cloudflare-workers", "sol-framework"],
-  "description": "Blog admin tool built with Luna UI and Sol Framework on Cloudflare Workers"
+  "keywords": [
+    "blog",
+    "luna-ui",
+    "cloudflare-workers",
+    "sol-framework"
+  ],
+  "description": "Blog admin tool built with Luna UI and Sol Framework on Cloudflare Workers",
+  "source": "app",
+  "preferred-target": "js"
 }

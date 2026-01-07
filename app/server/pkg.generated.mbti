@@ -2,6 +2,7 @@
 package "kazuph/blog_admin/server"
 
 import(
+  "mizchi/cloudflare"
   "mizchi/js/core"
   "mizchi/luna/luna"
   "mizchi/luna/sol/action"
@@ -17,19 +18,19 @@ pub fn array_len(@core.Any) -> Int
 
 pub fn config() -> @router.RouterConfig
 
-pub fn db_create_post(String, String, String, String, String, String) -> @core.Promise[@core.Any]
+pub async fn db_create_post(String, String, String, String, String, String) -> @core.Any
 
-pub fn db_delete_post(String) -> @core.Promise[@core.Any]
+pub async fn db_delete_post(String) -> @cloudflare.D1Result
 
-pub fn db_get_all_posts() -> @core.Promise[@core.Any]
+pub async fn db_get_all_posts() -> @core.Any
 
-pub fn db_get_post_by_id(String) -> @core.Promise[@core.Any]
+pub async fn db_get_post_by_id(String) -> @core.Any
 
-pub fn db_get_post_by_slug(String) -> @core.Promise[@core.Any]
+pub async fn db_get_post_by_slug(String) -> @core.Any
 
-pub fn db_get_published_posts() -> @core.Promise[@core.Any]
+pub async fn db_get_published_posts() -> @core.Any
 
-pub fn db_update_post(String, String, String, String, String, String, String) -> @core.Promise[@core.Any]
+pub async fn db_update_post(String, String, String, String, String, String, String) -> @core.Any
 
 pub fn get_int(@core.Any, String) -> Int
 

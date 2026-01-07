@@ -1,67 +1,117 @@
-///| D1 Database FFI Bindings for Cloudflare Workers
-///| Based on sol_sqlite pattern, adapted for D1
+///| D1 Database Access Layer using mizchi/cloudflare package
+///| Replaces custom FFI with official package types
 
 // =============================================================================
-// D1 Database FFI - JavaScript bindings for Cloudflare D1
+// D1 Database Access - Using mizchi/cloudflare package
 // =============================================================================
 
 // Note: D1 database is passed via env binding in Cloudflare Workers
-// globalThis.__D1_DB is set by the worker entry point
+// globalThis.__D1_DB is set by the worker entry point (src/worker.ts)
+
+///| Get D1 database from global context
+fn get_db() -> @cloudflare.D1Database {
+  let db_js : @core.Any = get_global_db()
+  @core.identity(db_js)
+}
+
+///| Get global D1 database reference (minimal FFI - required for binding access)
+extern "js" fn get_global_db() -> @core.Any =
+  #| () => {
+  #|   const db = globalThis.__D1_DB;
+  #|   if (!db) throw new Error('D1 database not initialized');
+  #|   return db;
+  #| }
+
+// =============================================================================
+// Blog Post CRUD Operations - Using @cloudflare.D1Database API
+// =============================================================================
 
 ///| Get all published blog posts
-pub extern "js" fn db_get_published_posts() -> @core.Promise[@core.Any] =
-  #| async () => {
-  #|   const db = globalThis.__D1_DB;
-  #|   if (!db) throw new Error('D1 database not initialized');
-  #|   const r = await db.prepare("SELECT * FROM posts WHERE status = 'published' ORDER BY published_at DESC").all();
-  #|   return r.results;
-  #| }
+pub async fn db_get_published_posts() -> @core.Any {
+  let db = get_db()
+  let result = db
+    .prepare("SELECT * FROM posts WHERE status = 'published' ORDER BY published_at DESC")
+    .all()
+  result.results_raw()
+}
 
 ///| Get all posts (for admin)
-pub extern "js" fn db_get_all_posts() -> @core.Promise[@core.Any] =
-  #| async () => {
-  #|   const db = globalThis.__D1_DB;
-  #|   if (!db) throw new Error('D1 database not initialized');
-  #|   const r = await db.prepare("SELECT * FROM posts ORDER BY updated_at DESC").all();
-  #|   return r.results;
-  #| }
+pub async fn db_get_all_posts() -> @core.Any {
+  let db = get_db()
+  let result = db
+    .prepare("SELECT * FROM posts ORDER BY updated_at DESC")
+    .all()
+  result.results_raw()
+}
 
 ///| Get a single blog post by slug
-pub extern "js" fn db_get_post_by_slug(slug : String) -> @core.Promise[@core.Any] =
-  #| async (slug) => {
-  #|   const db = globalThis.__D1_DB;
-  #|   if (!db) throw new Error('D1 database not initialized');
-  #|   return await db.prepare("SELECT * FROM posts WHERE slug = ?").bind(slug).first();
-  #| }
+pub async fn db_get_post_by_slug(slug : String) -> @core.Any {
+  let db = get_db()
+  let row = db
+    .prepare("SELECT * FROM posts WHERE slug = ?")
+    .bind1(@core.any(slug))
+    .first()
+  match row {
+    Some(r) => r
+    None => @core.null()
+  }
+}
 
 ///| Get a single blog post by id
-pub extern "js" fn db_get_post_by_id(id : String) -> @core.Promise[@core.Any] =
-  #| async (id) => {
-  #|   const db = globalThis.__D1_DB;
-  #|   if (!db) throw new Error('D1 database not initialized');
-  #|   return await db.prepare("SELECT * FROM posts WHERE id = ?").bind(id).first();
-  #| }
+pub async fn db_get_post_by_id(id : String) -> @core.Any {
+  let db = get_db()
+  let row = db
+    .prepare("SELECT * FROM posts WHERE id = ?")
+    .bind1(@core.any(id))
+    .first()
+  match row {
+    Some(r) => r
+    None => @core.null()
+  }
+}
 
 ///| Create a new post
-pub extern "js" fn db_create_post(
+pub async fn db_create_post(
   title : String,
   slug : String,
   content : String,
   content_html : String,
   excerpt : String,
   status : String
-) -> @core.Promise[@core.Any] =
-  #| async (title, slug, content, content_html, excerpt, status) => {
-  #|   const db = globalThis.__D1_DB;
-  #|   if (!db) throw new Error('D1 database not initialized');
-  #|   const published_at = status === 'published' ? new Date().toISOString() : null;
-  #|   return await db.prepare(
-  #|     "INSERT INTO posts (title, slug, content, content_html, excerpt, status, published_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *"
-  #|   ).bind(title, slug, content, content_html, excerpt, status, published_at).first();
-  #| }
+) -> @core.Any {
+  let db = get_db()
+  let published_at = if status == "published" {
+    get_timestamp()
+  } else {
+    ""
+  }
+  let published_at_val : @core.Any = if published_at == "" {
+    @core.null()
+  } else {
+    @core.any(published_at)
+  }
+  let row = db
+    .prepare(
+      "INSERT INTO posts (title, slug, content, content_html, excerpt, status, published_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *",
+    )
+    .bind([
+      @core.any(title),
+      @core.any(slug),
+      @core.any(content),
+      @core.any(content_html),
+      @core.any(excerpt),
+      @core.any(status),
+      published_at_val,
+    ])
+    .first()
+  match row {
+    Some(r) => r
+    None => @core.null()
+  }
+}
 
 ///| Update an existing post
-pub extern "js" fn db_update_post(
+pub async fn db_update_post(
   id : String,
   title : String,
   slug : String,
@@ -69,22 +119,33 @@ pub extern "js" fn db_update_post(
   content_html : String,
   excerpt : String,
   status : String
-) -> @core.Promise[@core.Any] =
-  #| async (id, title, slug, content, content_html, excerpt, status) => {
-  #|   const db = globalThis.__D1_DB;
-  #|   if (!db) throw new Error('D1 database not initialized');
-  #|   return await db.prepare(
-  #|     "UPDATE posts SET title = ?, slug = ?, content = ?, content_html = ?, excerpt = ?, status = ? WHERE id = ? RETURNING *"
-  #|   ).bind(title, slug, content, content_html, excerpt, status, id).first();
-  #| }
+) -> @core.Any {
+  let db = get_db()
+  let row = db
+    .prepare(
+      "UPDATE posts SET title = ?, slug = ?, content = ?, content_html = ?, excerpt = ?, status = ? WHERE id = ? RETURNING *",
+    )
+    .bind([
+      @core.any(title),
+      @core.any(slug),
+      @core.any(content),
+      @core.any(content_html),
+      @core.any(excerpt),
+      @core.any(status),
+      @core.any(id),
+    ])
+    .first()
+  match row {
+    Some(r) => r
+    None => @core.null()
+  }
+}
 
 ///| Delete a post
-pub extern "js" fn db_delete_post(id : String) -> @core.Promise[@core.Any] =
-  #| async (id) => {
-  #|   const db = globalThis.__D1_DB;
-  #|   if (!db) throw new Error('D1 database not initialized');
-  #|   return await db.prepare("DELETE FROM posts WHERE id = ?").bind(id).run();
-  #| }
+pub async fn db_delete_post(id : String) -> @cloudflare.D1Result {
+  let db = get_db()
+  db.prepare("DELETE FROM posts WHERE id = ?").bind1(@core.any(id)).run()
+}
 
 // =============================================================================
 // Data Access Helpers - MoonBit Native Implementation

@@ -139,7 +139,7 @@ fn admin_layout(
 ///| Home page - lists published posts
 async fn home_page(_props : @router.PageProps) -> @server_dom.ServerNode {
   @server_dom.ServerNode::async_(async fn() {
-    let posts = db_get_published_posts().wait()
+    let posts = db_get_published_posts()
     let len = array_len(posts)
 
     let post_items : Array[@luna.Node[Unit]] = []
@@ -178,7 +178,7 @@ async fn home_page(_props : @router.PageProps) -> @server_dom.ServerNode {
 async fn post_detail(props : @router.PageProps) -> @server_dom.ServerNode {
   @server_dom.ServerNode::async_(async fn() {
     let slug = props.params.get_param("slug").unwrap_or("")
-    let post = db_get_post_by_slug(slug).wait()
+    let post = db_get_post_by_slug(slug)
 
     if is_null(post) {
       return @luna.fragment([
@@ -208,7 +208,7 @@ async fn post_detail(props : @router.PageProps) -> @server_dom.ServerNode {
 ///| Admin posts list
 async fn admin_posts(_props : @router.PageProps) -> @server_dom.ServerNode {
   @server_dom.ServerNode::async_(async fn() {
-    let posts = db_get_all_posts().wait()
+    let posts = db_get_all_posts()
     let len = array_len(posts)
 
     let rows : Array[@luna.Node[Unit]] = []
@@ -277,7 +277,7 @@ async fn admin_new_post(_props : @router.PageProps) -> @server_dom.ServerNode {
 async fn admin_edit_post(props : @router.PageProps) -> @server_dom.ServerNode {
   @server_dom.ServerNode::async_(async fn() {
     let id = props.params.get_param("id").unwrap_or("")
-    let post = db_get_post_by_id(id).wait()
+    let post = db_get_post_by_id(id)
 
     if is_null(post) {
       return @luna.fragment([
@@ -326,7 +326,7 @@ async fn api_create_post(props : @router.PageProps) -> @core.Any {
   let content_html = render_markdown(content)
   let excerpt = safe_excerpt(content, 150)
 
-  let _result = db_create_post(title, slug, content, content_html, excerpt, status).wait()
+  let _result = db_create_post(title, slug, content, content_html, excerpt, status)
 
   // Return JSON success response with slug for client-side navigation
   action_json_response(true, "記事を作成しました", slug)
@@ -344,7 +344,7 @@ async fn api_update_post(props : @router.PageProps) -> @core.Any {
   let content_html = render_markdown(content)
   let excerpt = safe_excerpt(content, 150)
 
-  let _result = db_update_post(id, title, slug, content, content_html, excerpt, status).wait()
+  let _result = db_update_post(id, title, slug, content, content_html, excerpt, status)
   action_json_response(true, "記事を更新しました", slug)
 }
 
@@ -352,7 +352,7 @@ async fn api_update_post(props : @router.PageProps) -> @core.Any {
 ///| Client will handle the redirect
 async fn api_delete_post(props : @router.PageProps) -> @core.Any {
   let id = props.params.get_param("id").unwrap_or("")
-  let _result = db_delete_post(id).wait()
+  let _result = db_delete_post(id)
   // Return JSON success - client handles redirect
   action_json_response(true, "記事を削除しました", "")
 }
@@ -898,7 +898,6 @@ let create_post_action : @action.ActionHandler = @action.ActionHandler(async fn(
   let _result = db_create_post(
       title, slug, content, content_html, excerpt, final_status,
     )
-    .wait()
 
   @action.ActionResult::ok(
     action_json_response(true, "記事を作成しました", slug),
@@ -932,7 +931,6 @@ let update_post_action : @action.ActionHandler = @action.ActionHandler(async fn(
   let _result = db_update_post(
       id, title, slug, content, content_html, excerpt, final_status,
     )
-    .wait()
 
   @action.ActionResult::ok(
     action_json_response(true, "記事を更新しました", slug),
