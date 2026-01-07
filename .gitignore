@@ -32,6 +32,7 @@ Thumbs.db
 # Test artifacts (keep reports, ignore temp files)
 .artifacts/*/test-results/
 .artifacts/*/traces/
+test-results/
 
 # MoonBit
 .mooncakes/
