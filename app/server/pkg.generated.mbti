@@ -32,6 +32,12 @@ pub async fn db_get_published_posts() -> @core.Any
 
 pub async fn db_update_post(String, String, String, String, String, String, String) -> @core.Any
 
+pub fn error_to_message(ValidationError) -> String
+
+pub fn errors_to_json(Array[ValidationError]) -> String
+
+pub fn errors_to_messages(Array[ValidationError]) -> Array[String]
+
 pub fn get_int(@core.Any, String) -> Int
 
 pub fn get_str(@core.Any, String) -> String
@@ -62,6 +68,20 @@ pub fn thead(id? : String, class? : String, style? : String, attrs? : Array[(Str
 
 pub fn tr(id? : String, class? : String, style? : String, attrs? : Array[(String, @luna.Attr[Unit])], Array[@luna.Node[Unit]]) -> @luna.Node[Unit]
 
+pub fn validate_create_post(String, String, String, String) -> Result[Unit, Array[ValidationError]]
+
+pub fn validate_max_length(String, String, Int) -> Array[ValidationError]
+
+pub fn validate_min_length(String, String, Int) -> Array[ValidationError]
+
+pub fn validate_required(String, String) -> Array[ValidationError]
+
+pub fn validate_slug_pattern(String) -> Array[ValidationError]
+
+pub fn validate_status(String) -> Array[ValidationError]
+
+pub fn validate_update_post(String, String, String, String) -> Result[Unit, Array[ValidationError]]
+
 // Errors
 
 // Types and methods
@@ -77,6 +97,16 @@ pub struct Post {
   created_at : String
   updated_at : String
 }
+
+pub(all) enum ValidationError {
+  Required(String)
+  TooShort(String, Int)
+  TooLong(String, Int)
+  InvalidPattern(String)
+  InvalidStatus(String)
+}
+pub impl Eq for ValidationError
+pub impl Show for ValidationError
 
 // Type aliases
 

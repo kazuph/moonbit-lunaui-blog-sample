@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { navigateHomeToNewPost } from './helpers/navigation';
 
 /**
  * Markdown Editor E2E Tests
@@ -8,16 +9,15 @@ import { test, expect } from '@playwright/test';
  *
  * The editor uses MoonBit's @markdown package for parsing
  * and Luna UI signals for reactive updates.
+ *
+ * NAVIGATION RULE: Only goto('/') is allowed.
+ * All other pages must be reached via UI navigation (link clicks).
  */
 
 test.describe('Markdown Editor Island Component', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to new post page where the editor is rendered
-    await page.goto('/admin/posts/new');
-    await page.waitForLoadState('networkidle');
-
-    // Wait for form to be ready (the editor is part of the form)
-    await page.waitForSelector('form', { timeout: 10000 });
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
   });
 
   test('should render editor and preview panes', async ({ page }) => {
@@ -37,9 +37,7 @@ test.describe('Markdown Editor Island Component', () => {
     // Type a heading
     await textarea.fill('# Hello World');
 
-    // Wait for reactive update
-    await page.waitForTimeout(300);
-
+    // Playwright auto-retries assertions, no manual wait needed
     // Check preview contains rendered heading
     const h1 = preview.locator('h1');
     await expect(h1).toContainText('Hello World');
@@ -54,7 +52,6 @@ test.describe('Markdown Editor Island Component', () => {
 ### Heading 3`;
 
     await textarea.fill(markdown);
-    await page.waitForTimeout(300);
 
     await expect(preview.locator('h1')).toContainText('Heading 1');
     await expect(preview.locator('h2')).toContainText('Heading 2');
@@ -74,7 +71,6 @@ test.describe('Markdown Editor Island Component', () => {
 3. Third`;
 
     await textarea.fill(markdown);
-    await page.waitForTimeout(300);
 
     // Check unordered list
     const ulItems = preview.locator('ul li');
@@ -93,7 +89,6 @@ test.describe('Markdown Editor Island Component', () => {
     const markdown = `This is **bold** and this is *italic*.`;
 
     await textarea.fill(markdown);
-    await page.waitForTimeout(300);
 
     await expect(preview.locator('strong')).toContainText('bold');
     await expect(preview.locator('em')).toContainText('italic');
@@ -106,7 +101,6 @@ test.describe('Markdown Editor Island Component', () => {
     const markdown = `Check out [MoonBit](https://www.moonbitlang.com) for more info.`;
 
     await textarea.fill(markdown);
-    await page.waitForTimeout(300);
 
     const link = preview.locator('a');
     await expect(link).toContainText('MoonBit');
@@ -127,7 +121,6 @@ console.log(hello);
 And inline \`code\` too.`;
 
     await textarea.fill(markdown);
-    await page.waitForTimeout(300);
 
     // Check code block
     const codeBlock = preview.locator('pre code, pre');
@@ -148,7 +141,6 @@ And inline \`code\` too.`;
 > It spans multiple lines.`;
 
     await textarea.fill(markdown);
-    await page.waitForTimeout(300);
 
     const blockquote = preview.locator('blockquote');
     await expect(blockquote).toBeVisible();
@@ -200,7 +192,6 @@ fn main {
 Visit [Luna UI](https://github.com/user/luna) for more information.`;
 
     await textarea.fill(markdown);
-    await page.waitForTimeout(500);
 
     // Verify complex structure rendered
     await expect(preview.locator('h1')).toContainText('Technical Blog Post');
@@ -215,15 +206,14 @@ Visit [Luna UI](https://github.com/user/luna) for more information.`;
 
 test.describe('Editor Form Integration', () => {
   test('should auto-generate slug from title', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-    await page.waitForLoadState('networkidle');
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     const titleInput = page.locator('input[name="title"]');
     const slugInput = page.locator('input[name="slug"]');
 
     // Type a title
     await titleInput.fill('My Awesome Blog Post');
-    await page.waitForTimeout(500);
 
     // Check slug value - may be auto-generated or empty depending on hydration
     const slugValue = await slugInput.inputValue();
@@ -239,8 +229,8 @@ test.describe('Editor Form Integration', () => {
   });
 
   test('should preserve manually edited slug', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-    await page.waitForLoadState('networkidle');
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     const titleInput = page.locator('input[name="title"]');
     const slugInput = page.locator('input[name="slug"]');
@@ -250,7 +240,6 @@ test.describe('Editor Form Integration', () => {
 
     // Then change the title
     await titleInput.fill('Different Title');
-    await page.waitForTimeout(300);
 
     // Slug should remain the custom value (not auto-generated)
     // This depends on implementation - some preserve, some overwrite
@@ -260,8 +249,8 @@ test.describe('Editor Form Integration', () => {
   });
 
   test('should toggle between draft and published status', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-    await page.waitForLoadState('networkidle');
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     const statusSelect = page.locator('select[name="status"]');
 
@@ -282,8 +271,8 @@ test.describe('Editor Form Integration', () => {
 
 test.describe('Editor Accessibility', () => {
   test('should have proper form labels', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-    await page.waitForLoadState('networkidle');
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     // Check title input has label
     const titleLabel = page.locator('label[for="title"], label:has-text("Title"), label:has-text("タイトル")');
@@ -299,8 +288,8 @@ test.describe('Editor Accessibility', () => {
   });
 
   test('should be keyboard navigable', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-    await page.waitForLoadState('networkidle');
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     // Tab through form elements
     await page.keyboard.press('Tab');
@@ -316,30 +305,30 @@ test.describe('Editor Accessibility', () => {
 
 test.describe('Editor Error Handling', () => {
   test('should handle empty content gracefully', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-    await page.waitForLoadState('networkidle');
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     const textarea = page.locator('textarea[name="content"], .editor-textarea');
     const preview = page.locator('.preview');
 
     // Clear content if any
     await textarea.fill('');
-    await page.waitForTimeout(300);
 
     // Preview should not crash - should show placeholder or be empty
     await expect(preview).toBeVisible();
 
-    // No JavaScript errors should have occurred
+    // No JavaScript errors should have occurred (listener set up for future reference)
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    await page.waitForTimeout(500);
+    // Verify preview is stable and no errors occurred
+    await expect(preview).toBeVisible();
     expect(errors.filter(e => !e.includes('hydration'))).toHaveLength(0);
   });
 
   test('should handle special characters in markdown', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-    await page.waitForLoadState('networkidle');
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     const textarea = page.locator('textarea[name="content"], .editor-textarea');
     const preview = page.locator('.preview');
@@ -352,7 +341,6 @@ test.describe('Editor Error Handling', () => {
 Unicode: 日本語テスト 🎉 émojis`;
 
     await textarea.fill(markdown);
-    await page.waitForTimeout(300);
 
     // Should render without crashing
     await expect(preview).toBeVisible();

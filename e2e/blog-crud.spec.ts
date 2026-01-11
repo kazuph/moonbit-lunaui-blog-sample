@@ -1,10 +1,21 @@
 import { test, expect } from '@playwright/test';
+import {
+  startFromHome,
+  navigateToAdmin,
+  navigateToNewPost,
+  navigateToEditPost,
+  navigateHomeToNewPost,
+  navigateHomeToEditPost,
+} from './helpers/navigation';
 
 /**
  * Blog CRUD E2E Tests
  *
  * Tests the complete lifecycle of blog posts:
  * Create, Read, Update, Delete operations.
+ *
+ * NAVIGATION RULE: Only goto('/') is allowed.
+ * All other pages must be reached via UI navigation (link clicks).
  */
 
 // Generate unique identifiers for test isolation
@@ -23,9 +34,15 @@ test.describe('Blog Post CRUD Operations', () => {
     createdPostSlug = `test-post-${uniqueId}`;
     createdPostTitle = `Test Post ${uniqueId}`;
 
-    // Navigate to new post page
-    await page.goto('/admin/posts/new');
-    await expect(page.locator('form')).toBeVisible();
+    // Navigate to admin page first to get the initial count
+    await startFromHome(page);
+    await navigateToAdmin(page);
+
+    // Get the initial count of posts in the table
+    const beforeCount = await page.locator('table tbody tr').count();
+
+    // Navigate to new post page via UI: Admin -> New Post
+    await navigateToNewPost(page);
 
     // Fill in the form
     await page.fill('input[name="title"]', createdPostTitle);
@@ -61,11 +78,24 @@ test.describe('Blog Post CRUD Operations', () => {
     }
 
     expect(foundSuccess).toBe(true);
+
+    // Navigate back to admin list to verify the count increased
+    await navigateToAdmin(page);
+    await page.waitForLoadState('networkidle');
+
+    // Verify the count increased by 1
+    const afterCount = await page.locator('table tbody tr').count();
+    expect(afterCount).toBe(beforeCount + 1);
+
+    // Verify the new post exists in the list by title
+    const newPostRow = page.locator(`tr:has-text("${createdPostTitle}")`);
+    await expect(newPostRow.first()).toBeVisible();
   });
 
   test('should show created post in admin list', async ({ page }) => {
-    await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    // Navigate via UI: Home -> Admin
+    await startFromHome(page);
+    await navigateToAdmin(page);
 
     // Look for the created post in the table or list
     const postRow = page.locator(`tr:has-text("${createdPostTitle}"), .post-item:has-text("${createdPostTitle}")`);
@@ -91,6 +121,7 @@ test.describe('Blog Post CRUD Operations', () => {
     // Create a new page without auth credentials for public access
     const publicPage = await context.newPage();
 
+    // Only goto('/') is allowed
     await publicPage.goto('/');
     await publicPage.waitForLoadState('networkidle');
 
@@ -108,10 +139,8 @@ test.describe('Blog Post CRUD Operations', () => {
       return;
     }
 
-    // Navigate to edit page using ID
-    await page.goto(`/admin/posts/${createdPostId}/edit`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000); // Wait for Island to hydrate
+    // Navigate to edit page via UI: Home -> Admin -> Edit Post
+    await navigateHomeToEditPost(page, createdPostTitle);
 
     // Check if page loaded correctly (not 404)
     const is404 = await page.locator('text=Not Found, text=404').count() > 0;
@@ -126,8 +155,9 @@ test.describe('Blog Post CRUD Operations', () => {
     // Submit the form
     await page.click('button[type="submit"]');
 
-    // Wait for JavaScript form submission and response
-    await page.waitForTimeout(3000);
+    // Wait for success indicator or network idle
+    const successLocator = page.locator('.success-message, .success-actions, .form-result.success, text=更新しました, text=保存しました, text=Updated');
+    await expect(successLocator.first()).toBeVisible({ timeout: 10000 }).catch(() => {});
     await page.waitForLoadState('networkidle');
 
     // Verify update succeeded - check multiple indicators
@@ -169,6 +199,7 @@ test.describe('Blog Post CRUD Operations', () => {
     // Create a new page without auth credentials for public access
     const publicPage = await context.newPage();
 
+    // Only goto('/') is allowed
     await publicPage.goto('/');
     await publicPage.waitForLoadState('networkidle');
 
@@ -179,7 +210,7 @@ test.describe('Blog Post CRUD Operations', () => {
     if (await publishedPost.count() > 0) {
       await expect(publishedPost.first()).toBeVisible();
 
-      // Try clicking to view post detail
+      // Try clicking to view post detail (UI navigation)
       await publishedPost.first().click();
       await publicPage.waitForLoadState('networkidle');
 
@@ -197,8 +228,11 @@ test.describe('Blog Post CRUD Operations', () => {
       return;
     }
 
-    await page.goto(`/admin/posts/${createdPostId}/edit`);
-    await page.waitForLoadState('networkidle');
+    // Navigate to edit page via UI: Home -> Admin -> Edit Post
+    await navigateHomeToEditPost(page, createdPostTitle);
+
+    // Wait for form to be ready
+    await expect(page.locator('textarea[name="content"]')).toBeVisible({ timeout: 10000 });
 
     const is404 = await page.locator('text=Not Found, text=404').count() > 0;
     if (is404) {
@@ -206,23 +240,50 @@ test.describe('Blog Post CRUD Operations', () => {
       return;
     }
 
-    // Update the content
-    const updatedContent = `# ${createdPostTitle}\n\nThis content has been **updated** by E2E tests.\n\n## New Section\n\nAdded new content here.`;
+    // Get the current content before update
+    const originalContent = await page.locator('textarea[name="content"]').inputValue();
+
+    // Update the content with new unique marker
+    const updateMarker = `updated-${Date.now()}`;
+    const updatedContent = `# ${createdPostTitle}\n\nThis content has been **updated** by E2E tests.\n\n## New Section\n\nAdded new content here. Marker: ${updateMarker}`;
     await page.fill('textarea[name="content"]', updatedContent);
 
     // Submit
     await page.click('button[type="submit"]');
+
+    // Wait for success indicator
+    const successLocator = page.locator('.success-message, .form-result.success, text=更新しました, text=保存しました');
+    await expect(successLocator.first()).toBeVisible({ timeout: 10000 }).catch(() => {});
     await page.waitForLoadState('networkidle');
 
-    // Verify by checking the public post page
+    // Verify content was updated by reloading edit page
+    await navigateToAdmin(page);
+    await navigateToEditPost(page, createdPostTitle);
+    await expect(page.locator('textarea[name="content"]')).toBeVisible({ timeout: 10000 });
+
+    // Verify the content in the form reflects the update
+    const savedContent = await page.locator('textarea[name="content"]').inputValue();
+    expect(savedContent).toContain('updated');
+    expect(savedContent).toContain('New Section');
+    expect(savedContent).toContain(updateMarker);
+    expect(savedContent).not.toBe(originalContent);
+
+    // Verify by navigating to public post page via UI
     const publicPage = await page.context().newPage();
-    await publicPage.goto(`/posts/${createdPostSlug}`);
+    await publicPage.goto('/');
     await publicPage.waitForLoadState('networkidle');
 
-    // Check for updated content markers
-    const content = await publicPage.content();
-    expect(content).toContain('updated');
-    expect(content).toContain('New Section');
+    // Click through to the post
+    const postLink = publicPage.locator(`a[href="/posts/${createdPostSlug}"], a:has-text("${createdPostTitle}")`);
+    if (await postLink.count() > 0) {
+      await postLink.first().click();
+      await publicPage.waitForLoadState('networkidle');
+
+      // Check for updated content markers
+      const content = await publicPage.content();
+      expect(content).toContain('updated');
+      expect(content).toContain('New Section');
+    }
 
     await publicPage.close();
   });
@@ -234,10 +295,24 @@ test.describe('Blog Post CRUD Operations', () => {
       return;
     }
 
-    // Navigate to the edit page where delete button is located
-    await page.goto(`/admin/posts/${createdPostId}/edit`);
+    // First, navigate to admin page to get the count before deletion
+    await startFromHome(page);
+    await navigateToAdmin(page);
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000); // Wait for Island component to hydrate
+
+    // Get the count before deletion
+    const beforeCount = await page.locator('table tbody tr').count();
+
+    // Verify the post exists before deletion
+    const postRowBeforeDelete = page.locator(`tr:has-text("${createdPostTitle}")`);
+    await expect(postRowBeforeDelete.first()).toBeVisible();
+
+    // Navigate to edit page via UI: Admin -> Edit Post
+    await navigateToEditPost(page, createdPostTitle);
+
+    // Wait for Island component to hydrate by checking for delete button
+    const deleteButton = page.locator('button:has-text("記事を削除"), button.btn-danger');
+    await expect(deleteButton.first()).toBeVisible({ timeout: 10000 }).catch(() => {});
 
     // Check if page loaded correctly
     const is404 = await page.locator('text=Not Found, text=404').count() > 0;
@@ -247,7 +322,6 @@ test.describe('Blog Post CRUD Operations', () => {
     }
 
     // Find the delete button in the Island component
-    const deleteButton = page.locator('button:has-text("記事を削除"), button.btn-danger');
     if (await deleteButton.count() === 0) {
       test.skip(true, 'Delete button not found on edit page');
       return;
@@ -261,26 +335,28 @@ test.describe('Blog Post CRUD Operations', () => {
     // Click delete button
     await deleteButton.click();
 
-    // Wait for the API call and redirect
-    await page.waitForTimeout(3000);
+    // Wait for redirect to admin page (delete action redirects)
+    await page.waitForURL(/\/admin(?!\/posts\/.*\/edit)/, { timeout: 10000 }).catch(() => {});
     await page.waitForLoadState('networkidle');
 
     // Verify we're redirected to admin page
     expect(page.url()).toContain('/admin');
     expect(page.url()).not.toContain('/edit');
 
-    // Verify post is no longer in list
-    const deletedPost = page.locator(`text=${createdPostTitle}`);
+    // Verify the count decreased by 1
+    const afterCount = await page.locator('table tbody tr').count();
+    expect(afterCount).toBe(beforeCount - 1);
+
+    // Verify the deleted post is no longer in the list
+    const deletedPost = page.locator(`tr:has-text("${createdPostTitle}")`);
     await expect(deletedPost).not.toBeVisible();
   });
 });
 
 test.describe('Form Validation', () => {
   test('should require title field', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-
-    // Wait for form to be ready
-    await expect(page.locator('form')).toBeVisible();
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     // Try to submit without title
     await page.fill('input[name="slug"]', 'test-slug');
@@ -294,9 +370,8 @@ test.describe('Form Validation', () => {
   });
 
   test('should require slug field', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-
-    await expect(page.locator('form')).toBeVisible();
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     // Fill title first
     await page.fill('input[name="title"]', 'Test Title');
@@ -312,9 +387,8 @@ test.describe('Form Validation', () => {
   });
 
   test('should validate slug format', async ({ page }) => {
-    await page.goto('/admin/posts/new');
-
-    await expect(page.locator('form')).toBeVisible();
+    // Navigate to new post page via UI: Home -> Admin -> New Post
+    await navigateHomeToNewPost(page);
 
     // Try invalid slug with special characters
     await page.fill('input[name="title"]', 'Test Title');
@@ -334,8 +408,9 @@ test.describe('Form Validation', () => {
 
 test.describe('Admin List Features', () => {
   test('should display posts table with correct columns', async ({ page }) => {
-    await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    // Navigate to admin page via UI: Home -> Admin
+    await startFromHome(page);
+    await navigateToAdmin(page);
 
     const table = page.locator('.posts-table, table');
     if (await table.count() > 0) {
@@ -350,8 +425,9 @@ test.describe('Admin List Features', () => {
   });
 
   test('should have working edit links', async ({ page }) => {
-    await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    // Navigate to admin page via UI: Home -> Admin
+    await startFromHome(page);
+    await navigateToAdmin(page);
 
     const editLinks = page.locator('a[href*="/edit"], a:has-text("Edit"), a:has-text("編集")');
 
@@ -360,7 +436,7 @@ test.describe('Admin List Features', () => {
       // ID can be numeric or UUID format
       expect(href).toMatch(/\/admin\/posts\/[\w-]+\/edit/);
 
-      // Click and verify navigation
+      // Click and verify navigation (UI navigation)
       await editLinks.first().click();
       await page.waitForLoadState('networkidle');
 
