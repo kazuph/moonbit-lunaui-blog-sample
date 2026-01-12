@@ -2,12 +2,23 @@
 package "kazuph/blog_admin/client"
 
 import(
+  "mizchi/js/core"
   "mizchi/luna/luna/dom/element"
   "moonbitlang/core/json"
 )
 
 // Values
+pub fn clear_loaded() -> Unit
+
+pub fn hydrate(@core.Any) -> Unit
+
 pub fn markdown_editor(MarkdownEditorProps) -> @element.DomNode
+
+pub fn scan() -> Unit
+
+pub fn start() -> Unit
+
+pub fn unload(String) -> Unit
 
 // Errors
 

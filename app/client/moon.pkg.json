@@ -10,7 +10,7 @@
   ],
   "link": {
     "js": {
-      "exports": ["markdown_editor"],
+      "exports": ["markdown_editor", "start", "scan", "hydrate", "unload", "clear_loaded"],
       "format": "esm"
     }
   }
