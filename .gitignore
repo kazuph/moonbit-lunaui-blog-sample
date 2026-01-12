@@ -8,9 +8,9 @@ target/
 .sol/
 app/__gen__/
 
-# Generated client bundles (built by scripts/bundle-client.js)
-static/markdown_editor.js
-static/markdown_editor.js.map
+# Generated client bundles (built from MoonBit by scripts/bundle-client.js)
+static/*.js
+static/*.js.map
 
 # Environment files (contains secrets)
 .env
